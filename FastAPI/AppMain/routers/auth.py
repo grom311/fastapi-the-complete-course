@@ -1,4 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+import sys
+sys.path.append("..")
+from fastapi import (
+    FastAPI,
+    Depends,
+    HTTPException,
+    status,
+    APIRouter
+)
 from pydantic import BaseModel
 from typing import Optional
 import models
@@ -26,7 +34,7 @@ bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 models.Base.metadata.create_all(bind=engine)
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl='token')
 
-app = FastAPI()
+router = APIRouter()
 
 
 def get_db():
@@ -73,7 +81,7 @@ async def get_current_user(token: str = Depends(oauth2_bearer)):
     except JWTError:
         raise get_user_exception()
 
-@app.post("/create/user")
+@router.post("/create/user")
 async def create_new_user(create_user: CreateUser, db: Session = Depends(get_db)):
     create_user_model = models.Users()
     create_user_model.email = create_user.email
@@ -90,7 +98,7 @@ async def create_new_user(create_user: CreateUser, db: Session = Depends(get_db)
     db.commit()
 
 
-@app.post("/token")
+@router.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = authenicate_user(form_data.username, form_data.password, db)
 
@@ -100,6 +108,12 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     token = create_access_token(user.username, user.id, expire_delta=token_expire)
     return {"token": token}
 
+
+@router.get("/users")
+async def create_new_user( db: Session = Depends(get_db)):
+    return db.query(models.Users)\
+        .all()
+# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJxd2VyIiwiaWQiOjEsImV4cCI6MTY1MzE0NzM1M30.rcvk4PyifiMaMTqQMF1Ku42XfOml9KZcoHegEpXOVU4
 
 def get_user_exception():
     creadentials_exception = HTTPException(
