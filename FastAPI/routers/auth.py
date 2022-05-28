@@ -1,5 +1,4 @@
 import sys
-from urllib import response
 sys.path.append("..")
 
 from starlette import status
@@ -14,7 +13,6 @@ from fastapi import (
     Response,
     Form
 )
-from pydantic import BaseModel
 from typing import Optional
 import models
 from passlib.context import CryptContext
@@ -102,7 +100,7 @@ async def get_current_user(request: Request):
             logout(request)
         return {"username": username, "id": user_id}
     except JWTError:
-        raise get_user_exception()
+        raise HTTPException(status_code=404, detail="Not Found")
 
 
 @router.post("/token")
