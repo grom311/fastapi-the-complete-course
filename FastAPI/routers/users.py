@@ -1,7 +1,7 @@
 import sys
 sys.path.append("..")
 
-from fastapi import Depends, APIRouter
+from fastapi import Depends, APIRouter, Response
 import models
 
 from database import engine, SessionLocal
@@ -89,3 +89,8 @@ async def delete_user(user: dict = Depends(get_current_user),
     db.query(models.Users).filter(models.Users.id == user.get("id")).delete()
     db.commit()
     return "delete successful"
+
+
+@router.head('/head')
+async def head_request():
+    return Response()

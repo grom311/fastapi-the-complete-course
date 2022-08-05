@@ -1,1 +1,1 @@
-dvdfv
+uvicorn main:app --reload

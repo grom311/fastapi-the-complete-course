@@ -6,7 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 # engine = create_engine(
 #     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 # )
-SQLALCHEMY_DATABASE_URL = "postgresql://postgres:12345@localhost/FastApiAppDb"
+SQLALCHEMY_DATABASE_URL = "postgresql://postgres:admin@postgres/FastApiAppDb"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL

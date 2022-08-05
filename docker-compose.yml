@@ -1,0 +1,55 @@
+version: '3.7'
+services:
+  fastapi:
+    build: 
+      context: ./fastapi
+    command: uvicorn main:app --reload --workers 1 --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+      - "8082:8082"
+    volumes:
+      - .:/app
+    links:
+      - "redis"
+      - "postgres"
+  redis:
+    image: "redis:7.0.4-alpine"
+    ports:
+      - 6379:6379
+
+  postgres:
+      container_name: postgres_container
+      image: postgres
+      environment:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: admin
+        PGDATA: "/data/postgres"
+      volumes:
+        - postgres:/data/postgres
+        - ./docker_postgres_init.sql:/docker-entrypoint-initdb.d/docker_postgres_init.sql
+      ports:
+        - "15432:5432"
+      restart: unless-stopped
+
+  pgadmin:
+    container_name: demo_pgadmin
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+       - pgadmin:/var/lib/pgadmin
+       - ./docker_pgadmin_servers.json:/pgadmin4/servers.json
+    ports:
+      - "15433:80"
+    entrypoint:
+      - "/bin/sh"
+      - "-c"
+      - "/bin/echo 'postgres:5432:*:postgres:admin' > /tmp/pgpassfile && chmod 600 /tmp/pgpassfile && /entrypoint.sh"
+    restart: unless-stopped
+
+volumes:
+    postgres:
+    pgadmin:
