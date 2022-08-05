@@ -1,14 +1,17 @@
 import sys
+
 sys.path.append("..")
 
 from typing import Optional
-from fastapi import Depends, APIRouter
-import models
-from database import engine, SessionLocal
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from .auth import get_current_user, get_user_exception
 
+import models
+from database import SessionLocal, engine
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from fastapi import APIRouter, Depends
+
+from .auth import get_current_user, get_user_exception
 
 router = APIRouter(
     prefix='/address',

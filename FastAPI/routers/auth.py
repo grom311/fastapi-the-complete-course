@@ -1,22 +1,18 @@
 import sys
-sys.path.append("..")
-from fastapi import (
-    FastAPI,
-    Depends,
-    HTTPException,
-    status,
-    APIRouter
-)
-from pydantic import BaseModel
-from typing import Optional
-import models
-from passlib.context import CryptContext
-from sqlalchemy.orm import Session
-from database import SessionLocal, engine
-from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
-from datetime import datetime, timedelta
-from jose import jwt, JWTError
 
+sys.path.append("..")
+from datetime import datetime, timedelta
+from typing import Optional
+
+import models
+from database import SessionLocal, engine
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 SECRET_KEY = "qwacckhnbdff55ky674"
 ALGOTITHM = 'HS256'
@@ -53,8 +49,6 @@ def get_password_hash(password):
     return bcrypt_context.hash(password)
 
 def verify_password(plain_password, hashed_password):
-    print(f"ffffffffff: {plain_password}, {hashed_password}")
-    print(f"ddddddddddddddddd: {bcrypt_context.verify(plain_password, hashed_password)}")
     return bcrypt_context.verify(plain_password, hashed_password)
 
 

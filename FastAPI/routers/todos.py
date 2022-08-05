@@ -1,16 +1,17 @@
+import sys
 from typing import Optional
+
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-import sys
 sys.path.append("..")
 
 import models
-from database import engine, SessionLocal
-from fastapi import Depends, HTTPException, APIRouter
+from database import SessionLocal, engine
 
-from .auth import get_user_exception, get_current_user
+from fastapi import APIRouter, Depends, HTTPException
 
+from .auth import get_current_user, get_user_exception
 
 router = APIRouter(
     prefix='/todos',

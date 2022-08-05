@@ -1,11 +1,11 @@
 import sys
-sys.path.append("..")
-from fastapi import APIRouter, Depends
 
+sys.path.append("..")
+import models
 from database import SessionLocal
 from sqlalchemy.orm import Session
 
-import models
+from fastapi import APIRouter, Depends
 
 router = APIRouter()
 
@@ -25,5 +25,3 @@ async def get_company_name():
 @router.get("/employees")
 async def number_of_employees(db: Session = Depends(get_db)):
     return db.query(models.Users.id).all()
-
-

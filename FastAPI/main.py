@@ -1,9 +1,11 @@
 from typing import List
-from fastapi import FastAPI, Depends, WebSocket,WebSocketDisconnect
+
 import models
-from database import engine
-from routers import auth, todos, users, address
 from company import companyapis, dependencies
+from database import engine
+from routers import address, auth, todos, users
+
+from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
 app = FastAPI()
