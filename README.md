@@ -1,1 +1,2 @@
-uvicorn main:app --reload
+## For start  
+docker-compose up -d --build

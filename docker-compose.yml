@@ -3,6 +3,7 @@ services:
   fastapi:
     build: 
       context: ./fastapi
+    container_name: fastapi
     command: uvicorn main:app --reload --workers 1 --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
@@ -14,6 +15,7 @@ services:
       - "postgres"
   redis:
     image: "redis:7.0.4-alpine"
+    container_name: redis_container
     ports:
       - 6379:6379
 
@@ -26,7 +28,6 @@ services:
         PGDATA: "/data/postgres"
       volumes:
         - postgres:/data/postgres
-        - ./docker_postgres_init.sql:/docker-entrypoint-initdb.d/docker_postgres_init.sql
       ports:
         - "15432:5432"
       restart: unless-stopped
@@ -41,13 +42,9 @@ services:
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
     volumes:
        - pgadmin:/var/lib/pgadmin
-       - ./docker_pgadmin_servers.json:/pgadmin4/servers.json
+      #  - ./docker_pgadmin_servers.json:/pgadmin4/servers.json
     ports:
       - "15433:80"
-    entrypoint:
-      - "/bin/sh"
-      - "-c"
-      - "/bin/echo 'postgres:5432:*:postgres:admin' > /tmp/pgpassfile && chmod 600 /tmp/pgpassfile && /entrypoint.sh"
     restart: unless-stopped
 
 volumes:
