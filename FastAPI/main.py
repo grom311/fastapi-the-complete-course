@@ -86,17 +86,20 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-@app.get("/")
+@app.get("/chat")
 async def get():
     return HTMLResponse(html)
 
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: int):
+    print('111111111111111111111111')
     await manager.connect(websocket)
     try:
+        print('222222222222222222222')
         while True:
             data = await websocket.receive_text()
+            print(f"dataL {data}")
             await manager.send_personal_message(f"You wrote: {data}", websocket)
             await manager.broadcast(f"Client #{client_id} says: {data}")
     except WebSocketDisconnect:
