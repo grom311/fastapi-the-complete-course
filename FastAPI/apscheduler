@@ -1,0 +1,93 @@
+import asyncio
+import json
+import logging
+import datetime
+from fastapi import FastAPI
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from pydantic import BaseSettings
+import asyncpg
+import requests
+
+
+logger = logging.getLogger(__name__)
+class Settings(BaseSettings):
+    
+    async def get_connect(self):
+        try:
+            self.Config.conn = await asyncpg.create_pool('postgresql://postgres:12345@localhost/demo')
+        except asyncpg.exceptions.ConnectionDoesNotExistError:
+            logger.error('Connection Error.')
+    
+    async def run(self):
+        self.Config.a = 1
+        await self.get_connect()
+        # return self.get_tasks(self)
+
+settings = Settings()
+
+app = FastAPI(
+    title="Example of file importer and API.",
+    description=("Copy files from here to there, and access the list of files "
+                 "via an awesome FastAPI/Swagger UI"),
+    version="1.0.0"
+)
+
+
+@app.get("/")
+async def index():
+    return {"Message": "Hi darling, from the import service!"}
+
+
+class SchedulerService:
+    def __init__(self) -> None:
+        self.tasks = []
+        self.conn = settings.Config.conn
+
+    async def get_tasks(self):
+        # conn = self.gl_settings
+        async with self.conn.acquire() as con:
+            rows = await con.fetch(
+                'SELECT * FROM tasks')
+            self.tasks = [dict(row) for row in rows]
+        print(self.tasks)
+
+    async def test1(self):
+        collections = requests.get('https://api-v2-mainnet.paras.id/collections')
+        coll_json = collections.json()
+        print(type(coll_json))
+        async with self.conn.acquire() as con:
+            await con.fetch(
+                'INSERT INTO bookings.nft_collections(collections) VALUES ($1)', json.dumps(coll_json))
+        print(str(datetime.datetime.now()) + ': test1')
+
+    async def test2(self):
+        tokens = requests.get('https://api-v2-mainnet.paras.id/token')
+        tokens_json = tokens.json()
+        async with self.conn.acquire() as con:
+            await con.fetch(
+                'INSERT INTO bookings.nft_tokens(token) VALUES ($1)', json.dumps(tokens_json))
+        print(str(datetime.datetime.now()) + ': tokens')
+        print(str(datetime.datetime.now()) + ': crontab')
+
+    async def start(self):
+        logger.info("Starting scheduler service.")
+        await self.get_tasks()
+        self.queue = asyncio.Queue()
+        self.sch = AsyncIOScheduler()
+        self.sch.start()
+        self.sch.add_job(self.test1, 'cron', second='*/5')
+        self.sch.add_job(self.test2, 'cron', second='*/5')
+        # for t in self.tasks:
+        #     if t.get('name') == 'rep1':
+        #         self.sch.add_job(self.test1, CronTrigger.from_crontab(t.get('cron'), timezone=None))
+        #     elif t.get('name') == 'rep2':
+        #         self.sch.add_job(self.test2, CronTrigger.from_crontab(t.get('cron'), timezone=None))
+            
+
+@app.on_event("startup")
+async def run_scheduler():
+    await settings.run()
+    print(settings.Config.__dict__)
+    sch_srv = SchedulerService()
+    await sch_srv.start()
