@@ -1,93 +1,171 @@
 import asyncio
 import json
-import logging
-import datetime
-from fastapi import FastAPI
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from pydantic import BaseSettings
+from tkinter import N
 import asyncpg
-import requests
+import datetime
+from pydantic import BaseSettings
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
+import pika
 
 
-logger = logging.getLogger(__name__)
 class Settings(BaseSettings):
-    
-    async def get_connect(self):
-        try:
-            self.Config.conn = await asyncpg.create_pool('postgresql://postgres:12345@localhost/demo')
-        except asyncpg.exceptions.ConnectionDoesNotExistError:
-            logger.error('Connection Error.')
-    
-    async def run(self):
-        self.Config.a = 1
-        await self.get_connect()
-        # return self.get_tasks(self)
+    pass
+
 
 settings = Settings()
 
-app = FastAPI(
-    title="Example of file importer and API.",
-    description=("Copy files from here to there, and access the list of files "
-                 "via an awesome FastAPI/Swagger UI"),
-    version="1.0.0"
-)
+
+async def get_tasks():
+    conn = settings.Config.conn
+    async with conn.acquire() as con:
+        rows = await con.fetch(
+            'SELECT * FROM tasks')
+        data = [dict(row) for row in rows]
+    return data
+
+class Tasks:
+    pass
+
+EXCHANGE = 'data_preparer'
+ROUTING_KEY = 'data_preparer_key'
+RABBITMQ_USERNAME='admin'
+RABBITMQ_PASSWORD='admin'
+RABBITMQ_HOST='localhost'
+RABBITMQ_QUEUE='task'
+RABBITMQ_QUEUE_RES='task_res'
+
+def rabbit_send(body=''):
+    """send message json to rabbitMQ"""
+
+    # logger.info(f"Start message to {RABBITMQ_QUEUE_DATA_PREPARER}.")
+    credentials = pika.PlainCredentials(
+        username=RABBITMQ_USERNAME,
+        password=RABBITMQ_PASSWORD)
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(
+            host=RABBITMQ_HOST,
+            credentials=credentials)
+        )
+
+    channel = connection.channel()
+    channel.exchange_declare(exchange=EXCHANGE, exchange_type='direct', durable=True)
+    channel.queue_declare(queue=RABBITMQ_QUEUE, durable=True)
+    channel.queue_bind(
+        exchange=EXCHANGE,
+        queue=RABBITMQ_QUEUE,
+        routing_key=ROUTING_KEY)
+
+    channel.basic_publish(
+        exchange=EXCHANGE,
+        routing_key=ROUTING_KEY,
+        body=body,
+        properties=pika.BasicProperties(delivery_mode=1))
+    connection.close()
+    print("Message for data preparer was sended to rabbitMQ.")
 
 
-@app.get("/")
-async def index():
-    return {"Message": "Hi darling, from the import service!"}
+def callback(channel, method, properties, body):
+    """recursion method for pika"""
+    print(f"Number message: {method.delivery_tag}")
+    print(body)
+    print('End callback')
 
 
-class SchedulerService:
-    def __init__(self) -> None:
-        self.tasks = []
-        self.conn = settings.Config.conn
 
-    async def get_tasks(self):
-        # conn = self.gl_settings
-        async with self.conn.acquire() as con:
-            rows = await con.fetch(
-                'SELECT * FROM tasks')
-            self.tasks = [dict(row) for row in rows]
-        print(self.tasks)
+async def get_rabbit():
+    """main method, connect and get messages from rabbitMQ"""
+    credentials = pika.PlainCredentials(
+        username=RABBITMQ_USERNAME,
+        password=RABBITMQ_PASSWORD)
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(
+            host=RABBITMQ_HOST,
+            credentials=credentials)
+        )
+    print('Connection start:')
+    channel = connection.channel()
+    channel.queue_declare(queue=RABBITMQ_QUEUE, durable=True)
 
-    async def test1(self):
-        collections = requests.get('https://api-v2-mainnet.paras.id/collections')
-        coll_json = collections.json()
-        print(type(coll_json))
-        async with self.conn.acquire() as con:
-            await con.fetch(
-                'INSERT INTO bookings.nft_collections(collections) VALUES ($1)', json.dumps(coll_json))
-        print(str(datetime.datetime.now()) + ': test1')
+    print('[*] Waiting for logs. To exit press CTRL+C.')
+    cnt = channel.queue_declare(queue=RABBITMQ_QUEUE, durable=True).method.message_count
+    # print(channel.basic_get(RABBITMQ_QUEUE))
+    method_frame, header_frame, body = channel.basic_get(RABBITMQ_QUEUE)
+    if method_frame:
+        print(method_frame, header_frame, json.loads(body))
+        print(cnt)
+        channel.basic_ack(method_frame.delivery_tag)
+    else:
+        print('No message returned')
+    # if cnt:
+    #     for method_frame, properties, body in channel.basic_get(RABBITMQ_QUEUE):
+    #         print(body)
+    print('Get mess')
+    # channel.basic_consume(
+    #     queue=RABBITMQ_QUEUE, on_message_callback=callback)
+    # channel.start_consuming()
 
-    async def test2(self):
-        tokens = requests.get('https://api-v2-mainnet.paras.id/token')
-        tokens_json = tokens.json()
-        async with self.conn.acquire() as con:
-            await con.fetch(
-                'INSERT INTO bookings.nft_tokens(token) VALUES ($1)', json.dumps(tokens_json))
-        print(str(datetime.datetime.now()) + ': tokens')
-        print(str(datetime.datetime.now()) + ': crontab')
+async def get_connect():
+    conn = await asyncpg.create_pool('postgresql://postgres:12345@localhost/demo')
+    settings.Config.conn = conn
 
-    async def start(self):
-        logger.info("Starting scheduler service.")
-        await self.get_tasks()
-        self.queue = asyncio.Queue()
-        self.sch = AsyncIOScheduler()
-        self.sch.start()
-        self.sch.add_job(self.test1, 'cron', second='*/5')
-        self.sch.add_job(self.test2, 'cron', second='*/5')
-        # for t in self.tasks:
-        #     if t.get('name') == 'rep1':
-        #         self.sch.add_job(self.test1, CronTrigger.from_crontab(t.get('cron'), timezone=None))
-        #     elif t.get('name') == 'rep2':
-        #         self.sch.add_job(self.test2, CronTrigger.from_crontab(t.get('cron'), timezone=None))
-            
 
-@app.on_event("startup")
-async def run_scheduler():
-    await settings.run()
-    print(settings.Config.__dict__)
-    sch_srv = SchedulerService()
-    await sch_srv.start()
+async def test1():
+    params = {'key': 'test'}
+    rabbit_send(body=json.dumps(params))
+    print(str(datetime.datetime.now())+ 'test1')
+    
+async def test2():
+    print(str(datetime.datetime.now()) + ': crontab')
+
+async def main():
+    # Establish a connection to an existing database named "test"
+    # as a "postgres" user.
+    await get_connect()
+    conn = settings.Config.conn
+    # print(settings.Config.id)
+    tasks = await get_tasks()
+    print(tasks)
+    # Execute a statement to create a new table.
+    async with conn.acquire() as con:
+        await con.execute('''
+            CREATE TABLE if not exists tasks(
+                id serial PRIMARY KEY,
+                name varchar(20),
+                cron text
+            )
+        ''')
+
+        # Insert a record into the created table.
+        # await con.execute('''
+        #     INSERT INTO users(name, dob) VALUES($1, $2)
+        # ''', 'Bob', datetime.date(1984, 3, 1))
+        # await con.execute('''
+        #     INSERT INTO users(name, dob) VALUES($1, $2)
+        # ''', 'Bob2', datetime.date(1984, 3, 1))
+        # Select a row from the table.
+        rows = await con.fetch(
+            'SELECT * FROM users WHERE name = $1', 'Bob')
+    # data = [dict(row) for row in rows]
+    # print(data)
+    # *row* now contains
+    # asyncpg.Record(id=1, name='Bob', dob=datetime.date(1984, 3, 1))
+
+    # Close the connection.
+    await conn.close()
+# asyncio.run(main())
+
+
+scheduler = AsyncIOScheduler()
+
+scheduler.add_job(get_rabbit, 'cron', second='*/5')
+scheduler.add_job(test1, CronTrigger.from_crontab('*/1 * * * *', timezone=None))
+# scheduler.add_job(test2, CronTrigger.from_crontab('*/1 * * * *', timezone=None))
+scheduler.start()
+
+try:
+    asyncio.get_event_loop().run_forever()
+    # get_rabbit()
+except (KeyboardInterrupt, SystemExit):
+    pass 
