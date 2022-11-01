@@ -169,3 +169,23 @@ try:
     # get_rabbit()
 except (KeyboardInterrupt, SystemExit):
     pass 
+
+
+def main2():
+    """main method, connect and get messages from rabbitMQ"""
+    credentials = pika.PlainCredentials(
+        username=RABBITMQ_USERNAME,
+        password=RABBITMQ_PASSWORD)
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(
+            host=RABBITMQ_HOST,
+            credentials=credentials)
+        )
+    logger.info('Connection start:')
+    channel = connection.channel()
+    channel.queue_declare(queue=RABBITMQ_QUEUE_TO_ELASTIC, durable=True)
+
+    logger.info('[*] Waiting for logs. To exit press CTRL+C.')
+    channel.basic_consume(
+        queue=RABBITMQ_QUEUE_TO_ELASTIC, on_message_callback=callback)
+    channel.start_consuming()
