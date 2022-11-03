@@ -190,3 +190,4 @@ def main2():
         queue=RABBITMQ_QUEUE_TO_ELASTIC, on_message_callback=callback)
     channel.start_consuming()
 # https://itracer.medium.com/rabbitmq-publisher-and-consumer-with-fastapi-175fe87aefe1
+# https://brandthill.com/blog/pika.html
